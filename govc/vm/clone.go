@@ -52,6 +52,9 @@ type clone struct {
 	annotation    string
 	snapshot      string
 	link          bool
+	custip        string
+	custmask      string
+	custgw        string
 
 	Client         *vim25.Client
 	Datacenter     *object.Datacenter
@@ -105,6 +108,9 @@ func (cmd *clone) Register(ctx context.Context, f *flag.FlagSet) {
 	f.StringVar(&cmd.annotation, "annotation", "", "VM description")
 	f.StringVar(&cmd.snapshot, "snapshot", "", "Snapshot name to clone from")
 	f.BoolVar(&cmd.link, "link", false, "Creates a linked clone from snapshot or source VM")
+	f.StringVar(&cmd.custip, "custip", "", "Customization IPAddress")
+	f.StringVar(&cmd.custgw, "custgw", "", "Customization Gateway")
+	f.StringVar(&cmd.custmask, "custmask", "", "Customization Netmask")
 }
 
 func (cmd *clone) Usage() string {
@@ -419,6 +425,18 @@ func (cmd *clone) cloneVM(ctx context.Context) (*object.VirtualMachine, error) {
 		customSpec := customSpecItem.Spec
 		// set the customization
 		cloneSpec.Customization = &customSpec
+
+		if len(customSpec.NicSettingMap) > 0 {
+			nic := customSpec.NicSettingMap[0].Adapter
+
+			if ip, ok := nic.Ip.(*types.CustomizationFixedIp); ok {
+				ip.IpAddress = cmd.custip
+			}
+
+			nic.SubnetMask = cmd.custmask
+			nic.Gateway = append(nic.Gateway, cmd.custgw)
+			// nic.Gateway = []string{cmd.custgw}
+		}
 	}
 
 	task, err := cmd.VirtualMachine.Clone(ctx, cmd.Folder, cmd.name, *cloneSpec)
